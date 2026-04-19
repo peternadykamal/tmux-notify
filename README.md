@@ -42,7 +42,7 @@ Tmux plugin to notify you when processes are finished.
 *   Bash
 *   Tmux
 *   `notify-send` or `osascript`.
-*   **Optional**: `wget` (for telegram notifications).
+*   **Optional**: `curl` (for telegram notifications).
 
 > \[!NOTE]\
 > Works on Linux and macOS (note: only actively tested on Linux).
@@ -154,7 +154,7 @@ You can execute a custom command after a process has finished by putting `set -g
 ### Enable Ollama AI summaries
 
 > \[!WARNING]\
-> This feature requires [curl](https://curl.se/) to be installed on your system and a running [Ollama](https://ollama.com/) instance.
+> This feature requires [curl](https://curl.se/) to be installed on your system and a running [Ollama](https://ollama.com/) instance. [Python 3](https://www.python.org/) is recommended so multiline pane output is encoded correctly for the API (most Linux systems already have it).
 
 By default, the tool sends a generic `Tmux pane task completed!` message. You can enable AI-powered summaries using a local Ollama instance, which will analyze the command output and provide a brief summary of whether the command succeeded or failed.
 

@@ -73,8 +73,9 @@ if [[ ! -f "$PID_FILE_PATH" ]]; then  # If pane not yet monitored
       # Generate AI summary if Ollama is enabled and available
       if ollama_enabled && ollama_available; then
         # Capture the last 50 lines of output for analysis (to avoid overwhelming the API)
-        local relevant_output=$(echo "$output" | tail -n 50)
-        local ai_summary=$(generate_ollama_summary "$relevant_output")
+        # (must not use `local` here: this block is not inside a function)
+        relevant_output=$(echo "$output" | tail -n 50)
+        ai_summary=$(generate_ollama_summary "$relevant_output")
         notify "$ai_summary" "Tmux Task Summary" $2
       else
         notify "$complete_message" "$complete_title" $2

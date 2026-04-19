@@ -58,7 +58,13 @@ pushover_available() {
 # Send telegram message
 # Usage: send_telegram_message <bot_id> <chat_id> <message>
 send_telegram_message() {
-  wget --spider "https://api.telegram.org/bot$1/sendMessage?chat_id=$2&text=${3// /%20}" &> /dev/null
+  # Use POST with urlencoding: wget --spider sends HEAD, which does not deliver messages.
+  # disable_notification=false keeps sound/badge behavior for normal chats (default, explicit for clarity).
+  curl -sS -X POST "https://api.telegram.org/bot${1}/sendMessage" \
+    --data-urlencode "chat_id=${2}" \
+    --data-urlencode "text=${3}" \
+    --data-urlencode "disable_notification=false" \
+    &> /dev/null
 }
 
 # Send a message over https://pushover.net/
@@ -102,28 +108,55 @@ generate_ollama_summary() {
   # Truncate output if too long
   local truncated_output="${output:0:$max_chars_value}"
 
-  # Escape special characters for JSON
-  local escaped_output=$(echo "$truncated_output" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g; s/\t/\\t/g')
+  local response summary payload
 
-  # Create the prompt
-  local prompt="Analyze this terminal command output and provide a very brief summary (1-2 sentences max) of whether the command succeeded or failed, and what it did. Be concise:\n\n$escaped_output"
+  if command -v python3 &>/dev/null; then
+    payload=$(printf '%s' "$truncated_output" | OLLAMA_MODEL="$ollama_model_value" python3 -c '
+import json, os, sys
+output = sys.stdin.read()
+model = os.environ["OLLAMA_MODEL"]
+prompt = (
+    "Analyze this terminal command output and provide a very brief summary "
+    "(1-2 sentences max) of whether the command succeeded or failed, and what it did. "
+    "Be concise:\n\n"
+) + output
+print(json.dumps({"model": model, "prompt": prompt, "stream": False}))
+' 2>/dev/null) || payload=""
 
-  # Call Ollama API
-  local response=$(curl -s --max-time 30 \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -d "{\"model\": \"$ollama_model_value\", \"prompt\": \"$prompt\", \"stream\": false}" \
-    "$ollama_url_value/api/generate" 2>/dev/null)
+    if [ -n "$payload" ]; then
+      response=$(curl -sS --max-time 30 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "${ollama_url_value%/}/api/generate" 2>/dev/null) || response=""
 
-  # Extract response text using simple string parsing
-  local summary=$(echo "$response" | grep -o '"response":"[^"]*"' | sed 's/"response":"//; s/"$//')
+      summary=$(printf '%s' "$response" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get("response") or "", end="")
+except Exception:
+    pass
+' 2>/dev/null) || summary=""
+    fi
+  fi
 
-  # Unescape JSON sequences
-  summary=$(echo "$summary" | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g; s/\\\\/\\/g')
+  if [ -z "$summary" ] && [ -z "$payload" ]; then
+    # Fallback without python3: fragile on multiline pane output (invalid JSON)
+    local escaped_output
+    escaped_output=$(printf '%s' "$truncated_output" | sed ':a;N;$!ba; s/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\t/\\t/g; s/\r//g')
+    local prompt="Analyze this terminal command output and provide a very brief summary (1-2 sentences max) of whether the command succeeded or failed, and what it did. Be concise:\n\n$escaped_output"
+    response=$(curl -sS --max-time 30 \
+      -X POST \
+      -H "Content-Type: application/json" \
+      -d "{\"model\": \"$ollama_model_value\", \"prompt\": \"$prompt\", \"stream\": false}" \
+      "${ollama_url_value%/}/api/generate" 2>/dev/null) || response=""
+    summary=$(printf '%s' "$response" | grep -o '"response":"[^"]*"' | head -n1 | sed 's/"response":"//; s/"$//')
+    summary=$(printf '%s' "$summary" | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g; s/\\\\/\\/g')
+  fi
 
-  # Return summary or fallback message
-  if [ -n "$summary" ]; then
-    echo "$summary"
+  if [ -n "$(printf '%s' "$summary" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "$summary"
   else
     echo "Command completed - could not generate AI summary"
   fi
