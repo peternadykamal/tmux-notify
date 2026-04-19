@@ -24,6 +24,7 @@ Tmux plugin to notify you when processes are finished.
     *   [Enable telegram channel notifications](#enable-telegram-channel-notifications)
     *   [Enable Pushover notifications](#enable-pushover-notifications)
     *   [Execute custom notification commands](#execute-custom-notification-commands)
+    *   [Enable Ollama AI summaries](#enable-ollama-ai-summaries)
 *   [How does it work](#how-does-it-work)
 *   [Other use cases](#other-use-cases)
     *   [Use inside a docker container](#use-inside-a-docker-container)
@@ -149,6 +150,24 @@ You can execute a custom command after a process has finished by putting `set -g
 
 > \[!NOTE]\
 > Please consider contributing to [this repository](https://github.com/rickstaa/tmux-notify) if your custom command is useful for others.
+
+### Enable Ollama AI summaries
+
+> \[!WARNING]\
+> This feature requires [curl](https://curl.se/) to be installed on your system and a running [Ollama](https://ollama.com/) instance.
+
+By default, the tool sends a generic `Tmux pane task completed!` message. You can enable AI-powered summaries using a local Ollama instance, which will analyze the command output and provide a brief summary of whether the command succeeded or failed.
+
+> Put `set -g @tnotify-ollama-enabled 'on'` in the `.tmux.conf` config file to enable this feature.
+
+Additional configuration options:
+
+*   `set -g @tnotify-ollama-model 'qwen-coder:4.8b-cloud'`: The Ollama model to use (default: `qwen-coder:4.8b-cloud`).
+*   `set -g @tnotify-ollama-url 'http://localhost:11434'`: The URL of your Ollama instance (default: `http://localhost:11434`).
+*   `set -g @tnotify-ollama-max-chars '2000'`: Maximum characters of output to send to Ollama (default: `2000`).
+
+> \[!NOTE]\
+> Make sure you have Ollama running locally or have access to a remote Ollama instance. You can install Ollama by following the instructions at [ollama.com](https://ollama.com/).
 
 ## How does it work
 

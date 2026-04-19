@@ -47,3 +47,13 @@ export tmux_notify_pushover_title="@tnotify-pushover-title"
 export tmux_notify_pushover_token_default=""
 export tmux_notify_pushover_user_default=""
 export tmux_notify_pushover_title_default="Tmux Notify"
+
+# Ollama AI summary settings
+export ollama_enabled="@tnotify-ollama-enabled"
+export ollama_enabled_default="off"
+export ollama_model="@tnotify-ollama-model"
+export ollama_model_default="qwen-coder:4.8b-cloud"
+export ollama_url="@tnotify-ollama-url"
+export ollama_url_default="http://localhost:11434"
+export ollama_max_chars="@tnotify-ollama-max-chars"
+export ollama_max_chars_default="2000"

@@ -78,6 +78,57 @@ send_pushover_message() {
         }" &> /dev/null
 }
 
+# Check if Ollama summary is enabled
+ollama_enabled() {
+  local ollama_value="$(get_tmux_option "$ollama_enabled" "$ollama_enabled_default")"
+  [ "$ollama_value" == "on" ]
+}
+
+# Check if Ollama is available (URL is reachable)
+ollama_available() {
+  local ollama_url_value="$(get_tmux_option "$ollama_url" "$ollama_url_default")"
+  curl -s --max-time 2 "$ollama_url_value" &> /dev/null
+}
+
+# Generate AI summary using Ollama
+# Usage: generate_ollama_summary <pane_output>
+# Returns: short summary of command success/failure
+generate_ollama_summary() {
+  local output="$1"
+  local ollama_url_value="$(get_tmux_option "$ollama_url" "$ollama_url_default")"
+  local ollama_model_value="$(get_tmux_option "$ollama_model" "$ollama_model_default")"
+  local max_chars_value="$(get_tmux_option "$ollama_max_chars" "$ollama_max_chars_default")"
+
+  # Truncate output if too long
+  local truncated_output="${output:0:$max_chars_value}"
+
+  # Escape special characters for JSON
+  local escaped_output=$(echo "$truncated_output" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g; s/\t/\\t/g')
+
+  # Create the prompt
+  local prompt="Analyze this terminal command output and provide a very brief summary (1-2 sentences max) of whether the command succeeded or failed, and what it did. Be concise:\n\n$escaped_output"
+
+  # Call Ollama API
+  local response=$(curl -s --max-time 30 \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"model\": \"$ollama_model_value\", \"prompt\": \"$prompt\", \"stream\": false}" \
+    "$ollama_url_value/api/generate" 2>/dev/null)
+
+  # Extract response text using simple string parsing
+  local summary=$(echo "$response" | grep -o '"response":"[^"]*"' | sed 's/"response":"//; s/"$//')
+
+  # Unescape JSON sequences
+  summary=$(echo "$summary" | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g; s/\\\\/\\/g')
+
+  # Return summary or fallback message
+  if [ -n "$summary" ]; then
+    echo "$summary"
+  else
+    echo "Command completed - could not generate AI summary"
+  fi
+}
+
 # Send notification
 # Usage: notify <message> <title> <send_telegram>
 notify() {
