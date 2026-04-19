@@ -21,6 +21,7 @@ Tmux plugin to notify you when processes are finished.
     *   [Enable verbose notification](#enable-verbose-notification)
     *   [Change monitor update period](#change-monitor-update-period)
     *   [Add additional shell suffixes](#add-additional-shell-suffixes)
+    *   [Match prompt with a regular expression](#match-prompt-with-a-regular-expression)
     *   [Enable telegram channel notifications](#enable-telegram-channel-notifications)
     *   [Enable Pushover notifications](#enable-pushover-notifications)
     *   [Execute custom notification commands](#execute-custom-notification-commands)
@@ -107,6 +108,20 @@ The Tmux notify script uses your shell prompt suffix to check whether a command 
 > \[!NOTE]\
 > Feel free to open [a pull](https://github.com/rickstaa/tmux-notify/pulls) request or [issue](https://github.com/rickstaa/tmux-notify/issues) if you think your shell prompt suffix should be included by default.
 
+### Match prompt with a regular expression
+
+If your prompt does not end with a simple character (for example Starship shows a duration such as `20.083s` after the prompt symbol on the same line), suffix matching never sees `$`, `#`, or `%` at the end of the line.
+
+Set `set -g @tnotify-prompt-regex '…'` to use an **extended regular expression** (`grep -E`) instead of `@tnotify-prompt-suffixes`. When this option is non-empty (after trimming spaces), it **replaces** suffix mode. The check still uses the **last two lines** of the pane, like the default behavior.
+
+Example for a line that contains a `❯` prompt followed by optional text and a duration:
+
+```tmux
+set -g @tnotify-prompt-regex '❯.*[0-9]+\.[0-9]+s'
+```
+
+Adjust the pattern to match your actual prompt (copy a finished prompt line from the pane if needed). To return to suffix matching, unset the option or set it to an empty string.
+
 ### Enable telegram channel notifications
 
 > \[!WARNING]\
@@ -171,7 +186,7 @@ Additional configuration options:
 
 ## How does it work
 
-A naive approach. Checks if pane content ends with the bash prompt suffixes mentioned above every 10 seconds.
+A naive approach. Every few seconds it checks whether the last two lines of the pane match either `@tnotify-prompt-regex` (extended regex, if set) or the configured prompt suffix list.
 
 ## Other use cases
 

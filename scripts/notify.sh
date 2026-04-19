@@ -46,24 +46,40 @@ if [[ ! -f "$PID_FILE_PATH" ]]; then  # If pane not yet monitored
     complete_message="Tmux pane task completed!"
   fi
   
-  # Create bash suffix list
-  # NOTE: Looks complicated but uses shell parameter expansion
-  # see https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Shell-Parameter-Expansion
-  prompt_suffixes="$(get_tmux_option "$prompt_suffixes" "$prompt_suffixes_default")"
-  prompt_suffixes=${prompt_suffixes// /} # Remove whitespace
-  prompt_suffixes=${prompt_suffixes//,/|} # Replace comma with or operator
-  prompt_suffixes=$(escape_glob_chars "$prompt_suffixes")
-  prompt_suffixes="\(${prompt_suffixes}\)$"
-  
+  # Prompt detection: optional extended regex overrides comma-separated suffixes.
+  prompt_regex_value="$(get_tmux_option "$prompt_regex" "$prompt_regex_default")"
+  prompt_regex_value="${prompt_regex_value#"${prompt_regex_value%%[![:space:]]*}"}"
+  prompt_regex_value="${prompt_regex_value%"${prompt_regex_value##*[![:space:]]}"}"
+
+  if [ -n "$prompt_regex_value" ]; then
+    prompt_done_mode="regex"
+  else
+    prompt_done_mode="suffix"
+    # Create bash suffix list
+    # NOTE: Looks complicated but uses shell parameter expansion
+    # see https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Shell-Parameter-Expansion
+    prompt_suffixes="$(get_tmux_option "$prompt_suffixes" "$prompt_suffixes_default")"
+    prompt_suffixes=${prompt_suffixes// /} # Remove whitespace
+    prompt_suffixes=${prompt_suffixes//,/|} # Replace comma with or operator
+    prompt_suffixes=$(escape_glob_chars "$prompt_suffixes")
+    prompt_suffixes="\(${prompt_suffixes}\)$"
+  fi
+
   # Check process status every 10 seconds to see if has is finished
   while true; do
     # capture pane output
     output=$(tmux capture-pane -pt %"$PANE_ID")
-    
-    # run tests to determine if work is done
-    # if so, break and notify
-    if echo "$output" | tail -n2 | grep -e $prompt_suffixes &> /dev/null; then
-      # tmux display-message "$@"
+
+    # run tests to determine if work is done (last two lines, same as suffix mode)
+    pane_tail=$(printf '%s\n' "$output" | tail -n2)
+    pane_done=0
+    if [ "$prompt_done_mode" = "regex" ]; then
+      echo "$pane_tail" | grep -Eq "$prompt_regex_value" &> /dev/null && pane_done=1
+    else
+      echo "$pane_tail" | grep -e $prompt_suffixes &> /dev/null && pane_done=1
+    fi
+
+    if [ "$pane_done" -eq 1 ]; then
       if [[ "$1" == "true" ]]; then
         tmux switch -t \$"$SESSION_ID"
         tmux select-window -t @"$WINDOW_ID"
